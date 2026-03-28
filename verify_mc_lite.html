@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html><head><title>MC Verify (Lite)</title></head>
+<body>
+<pre id="out">Computing...</pre>
+<script>
+const PTS=[15,12,10,9,8,7,6,5,4,3,2,1];
+function ws(a,w){let t=0;for(let i=0;i<a.length;i++)t+=w[a[i]];let r=Math.random()*t,c=0;for(let i=0;i<a.length;i++){c+=w[a[i]];if(r<=c){const p=a[i];a.splice(i,1);return p;}}return a.pop();}
+function fy(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function msw(s){const a=(s-3)*0.5;const w=new Float64Array(12);for(let p=0;p<12;p++)w[p]=Math.pow(13-p,a);return w;}
+function mbw(b){const w=new Float64Array(12);if(b<=5){for(let i=0;i<12;i++)w[i]=1;return w;}const s=(b-5)/5;for(let i=0;i<12;i++)w[i]=1+s*Math.max(0,3-Math.abs(i-5.5));return w;}
+function sim(s0,rc,sk,bb,bs,N){const rl=4-rc;const sw2=sk.map(s=>msw(s));const bw=mbw(bb);const sm={W1:0,W2:0,W3:0,W4:0,MAX:0,MIN:0,DIFF:0,TOPBOT:0};
+for(let r=0;r<N;r++){const sc=[...s0];let tb=bs;const bsc=new Float64Array(8);
+for(let ra=0;ra<rl;ra++){const av=[0,1,2,3,4,5,6,7,8,9,10,11];const o=fy([0,1,2,3]);
+for(let oi=0;oi<4;oi++){const pi=o[oi];const p=ws(av,sw2[pi]);sc[pi]+=PTS[p];}
+for(let bi=0;bi<8&&av.length>0;bi++){bsc[bi]+=PTS[ws(av,bw)];}}
+for(let bi=0;bi<8;bi++)if(bsc[bi]+bs>tb)tb=bsc[bi]+bs;
+let mx=-1e9,mn=1e9;for(let i=0;i<4;i++){if(sc[i]>mx)mx=sc[i];if(sc[i]<mn)mn=sc[i];}
+for(let i=0;i<4;i++)if(sc[i]===mx)sm['W'+(i+1)]+=100;
+sm.MAX+=mx;sm.MIN+=mn;sm.DIFF+=(mx-mn);sm.TOPBOT+=tb;}
+const fv={};for(const k in sm)fv[k]=sm[k]/N;return fv;}
+
+const R=[];let P=0,F=0;
+function ok(c,m){if(!c){R.push('❌ '+m);F++;}else{R.push('✅ '+m);P++;}}
+function ap(v,e,t,m){const g=Math.abs(v-e)<=t;if(!g){R.push(`❌ ${m}: ${v.toFixed(3)} (exp ~${e.toFixed(3)} ±${t})`);F++;}else{R.push(`✅ ${m}: ${v.toFixed(3)}`);P++;}}
+
+setTimeout(()=>{
+
+R.push('=== T1: Skill Weights ===');
+const w3=msw(3);ok(Array.from(w3).every(v=>Math.abs(v-1)<1e-10),'Skill=3 → uniform');
+const w5=msw(5);ok(w5[0]>w5[11],'Skill=5: pos1 > pos12');
+const w1=msw(1);ok(w1[0]<w1[11],'Skill=1: pos1 < pos12 (bottom bias)');
+
+R.push('\n=== T2: Bot Weights ===');
+const bw5=mbw(5);ok(Array.from(bw5).every(v=>Math.abs(v-1)<1e-10),'Bias=5 uniform');
+const bw10=mbw(10);ap(bw10[5],3.5,1e-9,'Bias=10 pos6=3.5');
+ok(bw10[2]===1.0&&bw10[9]===1.0,'Bias=10: edges=1');
+ok(bw10[3]>1&&bw10[8]>1,'Bias=10: mid boosted');
+
+R.push('\n=== T3: No Duplicates (5K) ===');
+{const sw2=[3,3,3,3].map(s=>msw(s)),bw=mbw(5);let v=0;
+for(let r=0;r<5000;r++){const a=[0,1,2,3,4,5,6,7,8,9,10,11],u=new Set(),o=fy([0,1,2,3]);
+for(let i=0;i<4;i++){const p=ws(a,sw2[o[i]]);if(u.has(p))v++;u.add(p);}
+for(let i=0;i<8&&a.length>0;i++){const p=ws(a,bw);if(u.has(p))v++;u.add(p);}if(u.size!==12)v++;}
+ok(v===0,`No duplicates (${v} violations)`);}
+
+R.push('\n=== T4: Symmetric W (20K) ===');
+{const fv=sim([0,0,0,0],0,[3,3,3,3],5,0,20000);
+ap(fv.W1,25,3,'W1≈25');ap(fv.W2,25,3,'W2≈25');ap(fv.W3,25,3,'W3≈25');ap(fv.W4,25,3,'W4≈25');
+const ws2=fv.W1+fv.W2+fv.W3+fv.W4;ok(ws2>=99,'WSum≥99: '+ws2.toFixed(1));
+R.push(`  MAX=${fv.MAX.toFixed(1)} MIN=${fv.MIN.toFixed(1)} DIFF=${fv.DIFF.toFixed(1)}`);}
+
+R.push('\n=== T5: Skill Asymmetry (20K) ===');
+{const fv=sim([0,0,0,0],0,[5,3,3,3],5,0,20000);
+ok(fv.W1>fv.W2+3,`Skill5 W1=${fv.W1.toFixed(1)} >> W2=${fv.W2.toFixed(1)}`);}
+
+R.push('\n=== T6: Score Advantage (20K) ===');
+{const fv=sim([15,0,0,0],1,[3,3,3,3],5,0,20000);
+ok(fv.W1>fv.W2,`15pt lead: W1=${fv.W1.toFixed(1)} > W2=${fv.W2.toFixed(1)}`);}
+
+R.push('\n=== T7: TOPBOT (20K) ===');
+{const f0=sim([0,0,0,0],3,[3,3,3,3],5,0,20000);
+ok(f0.TOPBOT>0&&f0.TOPBOT<=15,`1-race TOPBOT=${f0.TOPBOT.toFixed(2)}`);
+const f30=sim([0,0,0,0],3,[3,3,3,3],5,30,20000);
+ap(f30.TOPBOT-f0.TOPBOT,30,2,'TOPBOT offset +30');}
+
+R.push('\n=== T8: DIFF Per-Trial (50K) ===');
+{const fv=sim([0,0,0,0],0,[3,3,3,3],5,0,50000);
+const d=fv.DIFF,m=fv.MAX-fv.MIN;
+R.push(`  E[DIFF]=${d.toFixed(3)}, E[MAX]-E[MIN]=${m.toFixed(3)}`);
+ok(d>=m-0.5,'E[DIFF]≥E[MAX]-E[MIN] (Jensen)');}
+
+R.push('\n=== T9: Ties (20K) ===');
+{const f1=sim([30,30,30,30],3,[3,3,3,3],5,0,20000);
+const s1=f1.W1+f1.W2+f1.W3+f1.W4;ap(s1,100,2,'Equal+1race WSum≈100');
+const f2=sim([15,12,0,0],3,[3,3,3,3],5,0,20000);
+const s2=f2.W1+f2.W2+f2.W3+f2.W4;ok(s2>100.3,`Tie WSum=${s2.toFixed(1)}>100`);}
+
+R.push('\n=== T10: Exact Analytical (20K) ===');
+{let tM=0,tm=0,tD=0,c=0;
+for(let a=0;a<12;a++)for(let b=0;b<12;b++){if(b===a)continue;
+for(let d=0;d<12;d++){if(d===a||d===b)continue;
+for(let e=0;e<12;e++){if(e===a||e===b||e===d)continue;
+const v=[PTS[a],PTS[b],PTS[d],PTS[e]],mx=Math.max(...v),mn=Math.min(...v);
+tM+=mx;tm+=mn;tD+=(mx-mn);c++;}}}
+const eM=tM/c,em=tm/c,eD=tD/c;
+R.push(`  Exact: MAX=${eM.toFixed(4)} MIN=${em.toFixed(4)} DIFF=${eD.toFixed(4)}`);
+const fv=sim([0,0,0,0],3,[3,3,3,3],5,0,20000);
+ap(fv.MAX,eM,0.3,'MC MAX≈exact');ap(fv.MIN,em,0.3,'MC MIN≈exact');ap(fv.DIFF,eD,0.4,'MC DIFF≈exact');}
+
+R.push('\n=== T11: 15pt Lead Unbeatable (20K) ===');
+{const fv=sim([15,0,0,0],3,[3,3,3,3],5,0,20000);
+ap(fv.W1,100,0.1,'15pt+1race=W1=100');}
+
+R.push('\n=== T12: Fisher-Yates (50K) ===');
+{const c=[0,0,0,0];for(let i=0;i<50000;i++)c[fy([0,1,2,3])[0]]++;
+for(let i=0;i<4;i++)ap(c[i]/50000,0.25,0.02,`Elem${i} in pos0`);}
+
+R.push('\n=== T13: CI Index Bug ===');
+{const B=20;R.push(`  floor(20*0.05)=${Math.floor(B*0.05)}, floor(20*0.95)=${Math.floor(B*0.95)}`);
+R.push('  ⚠️ Upper CI = index 19 = MAX of 20 batches (100th pctile, not 95th)');
+R.push('  Fix needed: use index 18 or Math.ceil approach');}
+
+R.push('\n=== T14: Stability ===');
+{for(const s of [1,1.5,2,2.5,3,3.5,4,4.5,5]){
+const w=msw(s);ok(Array.from(w).every(v=>isFinite(v)&&v>0),`Skill=${s} stable`);}}
+
+R.push(`\n=========== SUMMARY ===========`);
+R.push(`${P} passed, ${F} failed`);
+R.push(F===0?'All tests PASSED ✅':'Some tests FAILED ❌');
+
+document.getElementById('out').textContent=R.join('\n');
+},50);
+</script></body></html>

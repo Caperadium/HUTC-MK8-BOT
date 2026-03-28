@@ -206,13 +206,23 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* BOT SCORE INPUT */
 .bot-score-section { display: flex; flex-direction: column; gap: 6px; }
-.bot-score-row { display: flex; align-items: center; gap: 8px; }
+.bot-score-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+}
+.bot-score-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.bot-score-label {
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
 .bot-score-input {
-  width: 70px; padding: 8px; font-size: 14px; font-weight: 600;
+  width: 100%; padding: 7px 4px; font-size: 14px; font-weight: 600;
   background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
   color: var(--text-primary); text-align: center;
   font-family: 'JetBrains Mono', monospace;
 }
+.bot-score-input:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
 
 /* RIGHT PANEL */
 .panel-right {
@@ -389,14 +399,11 @@ input[type="range"]::-webkit-slider-thumb {
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">5 = uniform · 10 = strongly mid-biased (pos 4–9)</div>
     </div>
 
-    <!-- BOT SCORE -->
+    <!-- BOT SCORES -->
     <div>
-      <div class="section-label">Current Top Bot Score</div>
-      <div class="bot-score-row">
-        <span class="slider-label" style="font-size:13px;">Score</span>
-        <input type="number" class="bot-score-input" id="botScore" min="0" max="240" value="0">
-        <span style="font-size:11px;color:var(--text-muted);">cumulative from completed races</span>
-      </div>
+      <div class="section-label">Bot Scores (cumulative)</div>
+      <div class="bot-score-grid" id="botScoreGrid"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Enter each bot's total points from completed races</div>
     </div>
 
     <!-- SIMULATION CONTROLS -->
@@ -486,7 +493,7 @@ const state = {
   positions: [[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]], // [player][race]
   skills: [3,3,3,3],
   botBias: 5,
-  botScore: 0,
+  botScores: [0,0,0,0,0,0,0,0],
   simCount: 50000,
   autoRun: false,
   globalSpread: 2,
@@ -581,11 +588,16 @@ function initUI() {
     onInput();
   };
 
-  // Bot score
-  document.getElementById('botScore').oninput = function() {
-    state.botScore = parseInt(this.value) || 0;
-    onInput();
-  };
+  // Bot scores
+  const botGrid = document.getElementById('botScoreGrid');
+  botGrid.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    botGrid.innerHTML += `<div class="bot-score-cell">
+      <span class="bot-score-label">B${i+1}</span>
+      <input type="number" class="bot-score-input" id="botSc${i}" min="0" max="240" value="0"
+        oninput="setBotScore(${i},this.value)">
+    </div>`;
+  }
 
   // Global spread
   document.getElementById('globalSpread').oninput = function() {
@@ -661,13 +673,19 @@ function undoLastRace() {
   updateTotals();
   onInput();
 }
+function setBotScore(i, val) {
+  state.botScores[i] = parseInt(val) || 0;
+  onInput();
+}
 function clearAll() {
   for (let i = 0; i < 4; i++) for (let r = 0; r < 4; r++) {
     state.positions[i][r] = null;
     document.getElementById(`pos${i}_${r}`).value = '';
   }
-  document.getElementById('botScore').value = '0';
-  state.botScore = 0;
+  for (let i = 0; i < 8; i++) {
+    document.getElementById(`botSc${i}`).value = '0';
+    state.botScores[i] = 0;
+  }
   updateTotals();
   onInput();
 }
@@ -758,7 +776,7 @@ function makeBotWeights(bias) {
 self.onmessage = function(e) {
   const d = e.data;
   const N = d.simCount, racesLeft = 4 - d.racesCompleted;
-  const scores0 = d.scores, skills = d.skills, botBias = d.botBias, botScoreBase = d.botScore;
+  const scores0 = d.scores, skills = d.skills, botBias = d.botBias, botScores = d.botScores;
   const BATCHES = 20, batchN = Math.floor(N / BATCHES);
   const skillW = skills.map(s => makeSkillWeights(s));
   const botW = makeBotWeights(botBias);
@@ -767,7 +785,6 @@ self.onmessage = function(e) {
     const sums = {W1:0,W2:0,W3:0,W4:0,MAX:0,MIN:0,DIFF:0,TOPBOT:0};
     for (let run = 0; run < batchN; run++) {
       const sc = [scores0[0],scores0[1],scores0[2],scores0[3]];
-      let topBot = botScoreBase;
       const botSc = new Float64Array(8);
       for (let race = 0; race < racesLeft; race++) {
         const avail = [0,1,2,3,4,5,6,7,8,9,10,11];
@@ -783,7 +800,8 @@ self.onmessage = function(e) {
           botSc[bi] += PTS[bp];
         }
       }
-      for (let bi = 0; bi < 8; bi++) if (botSc[bi] + botScoreBase > topBot) topBot = botSc[bi] + botScoreBase;
+      let topBot = 0;
+      for (let bi = 0; bi < 8; bi++) { const total = botSc[bi] + botScores[bi]; if (total > topBot) topBot = total; }
       let mx = -Infinity, mn = Infinity;
       for (let i = 0; i < 4; i++) { if (sc[i] > mx) mx = sc[i]; if (sc[i] < mn) mn = sc[i]; }
       for (let i = 0; i < 4; i++) if (sc[i] === mx) sums['W'+(i+1)] += 100;
@@ -799,7 +817,7 @@ self.onmessage = function(e) {
   for (const k of keys) {
     const vals = batchResults.map(b => b[k]).sort((a,b) => a - b);
     fairValues[k] = vals.reduce((a,b)=>a+b,0) / BATCHES;
-    ci[k] = [vals[Math.floor(BATCHES*0.05)], vals[Math.floor(BATCHES*0.95)]];
+    ci[k] = [vals[1], vals[BATCHES - 2]];
   }
   let ties = 0;
   const wS = fairValues.W1+fairValues.W2+fairValues.W3+fairValues.W4;
@@ -833,7 +851,7 @@ function runSimulation() {
     // No simulation needed — compute exact values
     const scores = getScores();
     let mx = Math.max(...scores), mn = Math.min(...scores);
-    const fv = {MAX:mx, MIN:mn, DIFF:mx-mn, TOPBOT: state.botScore};
+    const fv = {MAX:mx, MIN:mn, DIFF:mx-mn, TOPBOT: Math.max(...state.botScores)};
     for (let i = 0; i < 4; i++) fv['W'+(i+1)] = scores[i] === mx ? 100 : 0;
     const ci = {};
     CONTRACT_NAMES.forEach(k => ci[k] = [fv[k], fv[k]]);
@@ -848,7 +866,7 @@ function runSimulation() {
     racesCompleted,
     skills: [...state.skills],
     botBias: state.botBias,
-    botScore: state.botScore,
+    botScores: [...state.botScores],
     simCount: state.simCount
   };
   if (worker) {

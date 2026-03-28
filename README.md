@@ -20,7 +20,7 @@ A browser-based Monte Carlo simulator for the HUTC 2026 Jump Trading round. Calc
 | **Race Results** | Enter each player's finishing position (1–12) per race. Total score auto-computes. |
 | **Skill Weights** | Slider per player (1–5). Adjusts how likely each player is to finish in top positions. Default 3 = roughly uniform. |
 | **Bot Position Bias** | Slider (0–10). Controls whether bots cluster toward middle positions. 5 = uniform, 10 = strongly mid-biased. |
-| **Current Top Bot Score** | Enter the leading bot's cumulative score from completed races for accurate TOPBOT values. |
+| **Bot Scores** | Enter all 8 bots' cumulative scores from completed races (B1–B8) for precise TOPBOT modeling. |
 | **Simulation** | Choose run count (10K/50K/100K), run manually or enable auto-run on input change. |
 | **Global Spread** | Half-width applied to all contracts. Bid = FV − spread, Ask = FV + spread. |
 | **Undo Race / Clear All** | Undo the last race entry or reset everything. |
@@ -123,7 +123,7 @@ where `strength = (bias − 5) / 5` (0 at bias=5, 1 at bias=10). Below bias=5, b
 
 ### TOPBOT Calculation
 
-Each of the 8 bots accumulates points across all simulated remaining races. TOPBOT is the maximum cumulative score among all 8 bots. If a "Current Top Bot Score" is entered, that value is added to the leading bot's simulated total to account for points already earned in completed races.
+Each of the 8 bots accumulates points across all simulated remaining races. TOPBOT is the maximum cumulative score among all 8 bots. By entering the exact cumulative scores of all 8 bots (B1–B8) from completed races, the engine assigns each bot its specific historical base score before simulating its future performance. This precise tracking eliminates the overestimation bias that occurs if you assume every bot started with the leading bot's score.
 
 ### DIFF Calculation
 
@@ -158,7 +158,7 @@ The CI bar on each card reflects this:
 
 ## Tips for Live Trading
 
-1. **After Race 1:** Update skill weights based on observed performance. Update bot bias and top bot score.
+1. **After Race 1:** Update skill weights based on observed performance. Update bot bias and all bot scores.
 2. **TOPBOT spread:** Consider widening to 4–5 (it has the highest variance of any contract).
 3. **Auto-run:** Enable for hands-free updates as you enter positions.
 4. **100K runs:** Use during breaks between races for tighter confidence intervals. Drop to 10K if you need sub-second updates during active trading.
