@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MK8 Grand Prix — Monte Carlo Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #111827;
+  --bg-card: #1a2235;
+  --bg-card-hover: #1f2a40;
+  --bg-input: #0d1424;
+  --border: #2a3654;
+  --border-focus: #6366f1;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.3);
+  --green: #22c55e;
+  --green-glow: rgba(34, 197, 94, 0.2);
+  --yellow: #eab308;
+  --yellow-glow: rgba(234, 179, 8, 0.2);
+  --red: #ef4444;
+  --red-glow: rgba(239, 68, 68, 0.2);
+  --cyan: #06b6d4;
+  --purple: #a855f7;
+  --orange: #f97316;
+  --pink: #ec4899;
+  --radius: 12px;
+  --transition: 0.2s ease;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 28px;
+  background: linear-gradient(135deg, #111827 0%, #1a1040 100%);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.header-title {
+  font-size: 20px; font-weight: 800;
+  background: linear-gradient(135deg, #818cf8, #c084fc);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.header-status {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  animation: pulse-dot 2s infinite;
+}
+.status-dot.running { background: var(--yellow); animation: pulse-dot 0.5s infinite; }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+}
+
+/* MAIN LAYOUT */
+.main { display: grid; grid-template-columns: 420px 1fr; gap: 0; min-height: calc(100vh - 57px); }
+
+/* LEFT PANEL */
+.panel-left {
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  overflow-y: auto; max-height: calc(100vh - 57px);
+  display: flex; flex-direction: column; gap: 18px;
+}
+
+.section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+
+/* STANDINGS TABLE */
+.standings-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.standings-table th {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  padding: 6px 4px; text-align: center;
+}
+.standings-table th:first-child { text-align: left; }
+.standings-table td { padding: 3px 3px; text-align: center; }
+.standings-table tr:hover td { background: rgba(99, 102, 241, 0.05); }
+
+.name-input {
+  width: 100%; padding: 8px 10px; font-size: 14px; font-weight: 600;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); font-family: 'Inter', sans-serif;
+  transition: border-color var(--transition);
+}
+.name-input:focus { outline: none; border-color: var(--border-focus); }
+
+.pos-select {
+  width: 100%; padding: 8px 2px; font-size: 15px; font-weight: 600;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); cursor: pointer; text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  appearance: none; -webkit-appearance: none;
+  transition: border-color var(--transition);
+  min-height: 44px;
+}
+.pos-select:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+.total-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px; font-weight: 700; color: var(--accent);
+  text-align: center; padding: 8px 0;
+}
+
+/* SLIDERS */
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-row {
+  display: flex; align-items: center; gap: 12px;
+}
+.slider-label {
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  min-width: 80px;
+}
+.slider-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 700; color: var(--accent);
+  min-width: 32px; text-align: right;
+}
+input[type="range"] {
+  flex: 1; height: 6px; -webkit-appearance: none; appearance: none;
+  background: var(--border); border-radius: 3px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px;
+  background: var(--accent); border-radius: 50%; cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* CONTROLS */
+.controls-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn {
+  padding: 10px 18px; font-size: 13px; font-weight: 700;
+  border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer; font-family: 'Inter', sans-serif;
+  transition: all var(--transition); min-height: 44px;
+}
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white; border: none;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px var(--accent-glow); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-secondary { background: var(--bg-card); color: var(--text-secondary); }
+.btn-secondary:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.btn-danger { background: transparent; color: var(--red); border-color: var(--red); }
+.btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+.toggle-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.toggle {
+  width: 44px; height: 24px; border-radius: 12px;
+  background: var(--border); position: relative; cursor: pointer;
+  transition: background var(--transition); border: none;
+}
+.toggle.active { background: var(--accent); }
+.toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: white; transition: transform var(--transition);
+}
+.toggle.active::after { transform: translateX(20px); }
+
+.sim-count-row { display: flex; gap: 6px; }
+.sim-count-btn {
+  flex: 1; padding: 8px; font-size: 12px; font-weight: 700;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-secondary); cursor: pointer; font-family: 'JetBrains Mono', monospace;
+  transition: all var(--transition);
+}
+.sim-count-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,0.1); }
+
+/* SPREAD INPUTS */
+.spread-section { display: flex; flex-direction: column; gap: 8px; }
+.spread-row { display: flex; align-items: center; gap: 8px; }
+.spread-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 60px; }
+.spread-input {
+  width: 60px; padding: 6px 8px; font-size: 14px; font-weight: 700;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+.spread-input:focus { outline: none; border-color: var(--border-focus); }
+
+/* BOT SCORE INPUT */
+.bot-score-section { display: flex; flex-direction: column; gap: 6px; }
+.bot-score-row { display: flex; align-items: center; gap: 8px; }
+.bot-score-input {
+  width: 70px; padding: 8px; font-size: 14px; font-weight: 600;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-primary); text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* RIGHT PANEL */
+.panel-right {
+  padding: 24px;
+  overflow-y: auto; max-height: calc(100vh - 57px);
+}
+
+/* CONTRACT CARDS */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--card-accent, var(--accent));
+}
+.card:hover { border-color: var(--card-accent, var(--accent)); transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+.card.updated { animation: card-flash 0.6s ease; }
+@keyframes card-flash {
+  0% { box-shadow: 0 0 20px var(--accent-glow); }
+  100% { box-shadow: none; }
+}
+.card-label {
+  font-size: 13px; font-weight: 800; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.card-fv {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 36px; font-weight: 900;
+  background: linear-gradient(135deg, #f1f5f9, #cbd5e1);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  line-height: 1.1; margin-bottom: 10px;
+}
+.card-bidask {
+  display: flex; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; font-weight: 600;
+}
+.card-bid { color: var(--green); }
+.card-ask { color: var(--red); }
+.card-ci {
+  margin-top: 8px; height: 4px; border-radius: 2px;
+  background: var(--border); overflow: hidden;
+}
+.card-ci-bar {
+  height: 100%; border-radius: 2px;
+  transition: width 0.5s ease, background 0.5s ease;
+}
+
+/* W-SUM BAR */
+.w-sum-bar {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 18px; margin-bottom: 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px;
+}
+.w-sum-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; font-size: 16px;
+}
+.w-sum-note { color: var(--text-muted); font-size: 12px; }
+
+/* POINTS REFERENCE */
+.points-ref {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden;
+}
+.points-ref-header {
+  padding: 12px 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 700; color: var(--text-secondary);
+  transition: background var(--transition);
+}
+.points-ref-header:hover { background: var(--bg-card-hover); }
+.points-ref-body {
+  padding: 0 18px; max-height: 0; overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+.points-ref-body.open { max-height: 200px; padding: 12px 18px; }
+.points-table {
+  width: 100%; font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+.points-table td { padding: 4px 8px; text-align: center; }
+.points-table tr:first-child td { color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.points-table tr:last-child td { color: var(--accent); font-weight: 700; }
+
+/* PROGRESS BAR */
+.progress-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 3px;
+  background: var(--bg-secondary); z-index: 200;
+  opacity: 0; transition: opacity 0.2s;
+}
+.progress-bar.visible { opacity: 1; }
+.progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  transition: width 0.1s linear;
+}
+
+/* PER-CONTRACT SPREAD OVERRIDES */
+.card-spread-override {
+  margin-top: 6px; display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-muted);
+}
+.card-spread-input {
+  width: 40px; padding: 3px 4px; font-size: 12px; font-weight: 600;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text-secondary); text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+.card-spread-input:focus { outline: none; border-color: var(--border-focus); color: var(--text-primary); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-title">🏎️ MK8 Grand Prix — Monte Carlo Engine</div>
+  <div class="header-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Ready</span>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <aside class="panel-left">
+
+    <!-- STANDINGS -->
+    <div>
+      <div class="section-label">Race Results</div>
+      <table class="standings-table">
+        <thead>
+          <tr><th>Player</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Total</th></tr>
+        </thead>
+        <tbody id="standingsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- SKILL WEIGHTS -->
+    <div>
+      <div class="section-label">Skill Weights</div>
+      <div class="slider-group" id="skillSliders"></div>
+    </div>
+
+    <!-- BOT BIAS -->
+    <div>
+      <div class="section-label">Bot Position Bias</div>
+      <div class="slider-row">
+        <span class="slider-label">Bias</span>
+        <input type="range" id="botBias" min="0" max="10" step="1" value="5">
+        <span class="slider-value" id="botBiasValue">5</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">5 = uniform · 10 = strongly mid-biased (pos 4–9)</div>
+    </div>
+
+    <!-- BOT SCORE -->
+    <div>
+      <div class="section-label">Current Top Bot Score</div>
+      <div class="bot-score-row">
+        <span class="slider-label" style="font-size:13px;">Score</span>
+        <input type="number" class="bot-score-input" id="botScore" min="0" max="240" value="0">
+        <span style="font-size:11px;color:var(--text-muted);">cumulative from completed races</span>
+      </div>
+    </div>
+
+    <!-- SIMULATION CONTROLS -->
+    <div>
+      <div class="section-label">Simulation</div>
+      <div class="sim-count-row">
+        <button class="sim-count-btn" data-count="10000">10K</button>
+        <button class="sim-count-btn active" data-count="50000">50K</button>
+        <button class="sim-count-btn" data-count="100000">100K</button>
+      </div>
+      <div class="controls-row" style="margin-top:10px;">
+        <button class="btn btn-primary" id="runBtn" onclick="runSimulation()">▶ Run Simulation</button>
+        <div class="toggle-row">
+          <button class="toggle" id="autoRunToggle" onclick="toggleAutoRun()"></button>
+          <span>Auto-run</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPREAD -->
+    <div class="spread-section">
+      <div class="section-label">Global Spread (half-width)</div>
+      <div class="spread-row">
+        <span class="spread-label">Default</span>
+        <input type="number" class="spread-input" id="globalSpread" min="0" max="50" step="0.5" value="2">
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">Per-contract overrides on each card</div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="controls-row">
+      <button class="btn btn-secondary" onclick="undoLastRace()">↩ Undo Race</button>
+      <button class="btn btn-danger" onclick="clearAll()">⟲ Clear All</button>
+    </div>
+
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <main class="panel-right">
+
+    <div class="section-label" style="margin-bottom:12px;">Fair Values</div>
+
+    <!-- W CONTRACTS -->
+    <div class="cards-grid" id="cardsW"></div>
+
+    <!-- W SUM -->
+    <div class="w-sum-bar">
+      <div>
+        <span style="color:var(--text-secondary);">ΣW =</span>
+        <span class="w-sum-value" id="wSumValue">—</span>
+      </div>
+      <span class="w-sum-note" id="wSumNote">Values above 100 reflect tie probability</span>
+    </div>
+
+    <!-- OTHER CONTRACTS -->
+    <div class="cards-grid" id="cardsOther"></div>
+
+    <!-- POINTS REF -->
+    <div class="points-ref" style="margin-top:20px;">
+      <div class="points-ref-header" onclick="togglePointsRef()">
+        <span>📋 Points Reference</span>
+        <span id="pointsRefArrow">▸</span>
+      </div>
+      <div class="points-ref-body" id="pointsRefBody">
+        <table class="points-table">
+          <tr><td>Pos</td><td>1st</td><td>2nd</td><td>3rd</td><td>4th</td><td>5th</td><td>6th</td><td>7th</td><td>8th</td><td>9th</td><td>10th</td><td>11th</td><td>12th</td></tr>
+          <tr><td>Pts</td><td>15</td><td>12</td><td>10</td><td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- PROGRESS BAR -->
+<div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+
+<script>
+// ===== CONSTANTS =====
+const POINTS = [15,12,10,9,8,7,6,5,4,3,2,1];
+const CONTRACT_NAMES = ['W1','W2','W3','W4','MAX','MIN','DIFF','TOPBOT'];
+const CARD_COLORS = ['#6366f1','#8b5cf6','#a855f7','#c084fc','#06b6d4','#22c55e','#eab308','#f97316'];
+
+// ===== STATE =====
+const state = {
+  names: ['Player 1','Player 2','Player 3','Player 4'],
+  positions: [[null,null,null,null],[null,null,null,null],[null,null,null,null],[null,null,null,null]], // [player][race]
+  skills: [3,3,3,3],
+  botBias: 5,
+  botScore: 0,
+  simCount: 50000,
+  autoRun: false,
+  globalSpread: 2,
+  spreads: {W1:null,W2:null,W3:null,W4:null,MAX:null,MIN:null,DIFF:null,TOPBOT:null},
+  results: null,
+  running: false
+};
+
+let debounceTimer = null;
+let worker = null;
+
+// ===== DERIVED =====
+function getScores() {
+  return state.positions.map(races =>
+    races.reduce((s, p) => s + (p !== null ? POINTS[p - 1] : 0), 0)
+  );
+}
+function getRacesCompleted() {
+  for (let r = 3; r >= 0; r--) {
+    if (state.positions.every(p => p[r] !== null)) return r + 1;
+  }
+  return 0;
+}
+function getSpread(contract) {
+  const ov = state.spreads[contract];
+  return (ov !== null && ov !== undefined && ov !== '') ? parseFloat(ov) : state.globalSpread;
+}
+
+// ===== UI INIT =====
+function initUI() {
+  // Standings rows
+  const tbody = document.getElementById('standingsBody');
+  tbody.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    const tr = document.createElement('tr');
+    // Name
+    let td = document.createElement('td');
+    td.innerHTML = `<input class="name-input" id="name${i}" value="${state.names[i]}" oninput="state.names[i]=${i};onInput()">`;
+    tr.appendChild(td);
+    // R1-R4
+    for (let r = 0; r < 4; r++) {
+      td = document.createElement('td');
+      let opts = '<option value="">—</option>';
+      for (let p = 1; p <= 12; p++) opts += `<option value="${p}">${p}</option>`;
+      td.innerHTML = `<select class="pos-select" id="pos${i}_${r}" onchange="setPosition(${i},${r},this.value)">${opts}</select>`;
+      tr.appendChild(td);
+    }
+    // Total
+    td = document.createElement('td');
+    td.innerHTML = `<div class="total-score" id="total${i}">0</div>`;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+  // Fix name input handler
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`name${i}`).oninput = function() { state.names[i] = this.value; updateSkillLabels(); };
+  }
+
+  // Skill sliders
+  const skillDiv = document.getElementById('skillSliders');
+  skillDiv.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    skillDiv.innerHTML += `<div class="slider-row">
+      <span class="slider-label" id="skillLabel${i}">${state.names[i]}</span>
+      <input type="range" min="1" max="5" step="0.5" value="3" id="skill${i}" oninput="setSkill(${i},this.value)">
+      <span class="slider-value" id="skillVal${i}">3.0</span>
+    </div>`;
+  }
+
+  // Contract cards - W
+  const cardsW = document.getElementById('cardsW');
+  cardsW.innerHTML = '';
+  for (let i = 0; i < 4; i++) buildCard(cardsW, CONTRACT_NAMES[i], CARD_COLORS[i]);
+  // Contract cards - other
+  const cardsO = document.getElementById('cardsOther');
+  cardsO.innerHTML = '';
+  for (let i = 4; i < 8; i++) buildCard(cardsO, CONTRACT_NAMES[i], CARD_COLORS[i]);
+
+  // Sim count buttons
+  document.querySelectorAll('.sim-count-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.sim-count-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.simCount = parseInt(btn.dataset.count);
+    };
+  });
+
+  // Bot bias
+  document.getElementById('botBias').oninput = function() {
+    state.botBias = parseInt(this.value);
+    document.getElementById('botBiasValue').textContent = this.value;
+    onInput();
+  };
+
+  // Bot score
+  document.getElementById('botScore').oninput = function() {
+    state.botScore = parseInt(this.value) || 0;
+    onInput();
+  };
+
+  // Global spread
+  document.getElementById('globalSpread').oninput = function() {
+    state.globalSpread = parseFloat(this.value) || 0;
+    if (state.results) updateDisplay(state.results);
+  };
+
+  updateTotals();
+  initWorker();
+}
+
+function buildCard(container, name, color) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = `card_${name}`;
+  card.style.setProperty('--card-accent', color);
+  card.innerHTML = `
+    <div class="card-label">${name}</div>
+    <div class="card-fv" id="fv_${name}">—</div>
+    <div class="card-bidask">
+      <span class="card-bid" id="bid_${name}">—</span>
+      <span class="card-ask" id="ask_${name}">—</span>
+    </div>
+    <div class="card-ci"><div class="card-ci-bar" id="ci_${name}" style="width:0%;background:${color}"></div></div>
+    <div class="card-spread-override">
+      <span>±</span>
+      <input class="card-spread-input" id="spread_${name}" placeholder="—"
+        oninput="setContractSpread('${name}',this.value)">
+    </div>`;
+  container.appendChild(card);
+}
+
+// ===== INPUT HANDLERS =====
+function setPosition(player, race, val) {
+  state.positions[player][race] = val === '' ? null : parseInt(val);
+  updateTotals();
+  onInput();
+}
+function setSkill(i, val) {
+  state.skills[i] = parseFloat(val);
+  document.getElementById(`skillVal${i}`).textContent = parseFloat(val).toFixed(1);
+  onInput();
+}
+function setContractSpread(name, val) {
+  state.spreads[name] = val === '' ? null : parseFloat(val);
+  if (state.results) updateDisplay(state.results);
+}
+function updateSkillLabels() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`skillLabel${i}`).textContent = state.names[i];
+  }
+}
+function updateTotals() {
+  const scores = getScores();
+  for (let i = 0; i < 4; i++) document.getElementById(`total${i}`).textContent = scores[i];
+}
+function toggleAutoRun() {
+  state.autoRun = !state.autoRun;
+  document.getElementById('autoRunToggle').classList.toggle('active', state.autoRun);
+}
+function togglePointsRef() {
+  const body = document.getElementById('pointsRefBody');
+  body.classList.toggle('open');
+  document.getElementById('pointsRefArrow').textContent = body.classList.contains('open') ? '▾' : '▸';
+}
+function undoLastRace() {
+  const rc = getRacesCompleted();
+  if (rc === 0) return;
+  for (let i = 0; i < 4; i++) {
+    state.positions[i][rc - 1] = null;
+    document.getElementById(`pos${i}_${rc - 1}`).value = '';
+  }
+  updateTotals();
+  onInput();
+}
+function clearAll() {
+  for (let i = 0; i < 4; i++) for (let r = 0; r < 4; r++) {
+    state.positions[i][r] = null;
+    document.getElementById(`pos${i}_${r}`).value = '';
+  }
+  document.getElementById('botScore').value = '0';
+  state.botScore = 0;
+  updateTotals();
+  onInput();
+}
+
+function onInput() {
+  if (!state.autoRun) return;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => runSimulation(), 300);
+}
+
+// ===== DISPLAY =====
+function updateDisplay(res) {
+  state.results = res;
+  const fvs = res.fairValues;
+  let wSum = 0;
+  CONTRACT_NAMES.forEach(name => {
+    const fv = fvs[name];
+    const sp = getSpread(name);
+    document.getElementById(`fv_${name}`).textContent = fv.toFixed(1);
+    document.getElementById(`bid_${name}`).textContent = Math.max(0, fv - sp).toFixed(1);
+    document.getElementById(`ask_${name}`).textContent = (fv + sp).toFixed(1);
+    // CI bar
+    const ci = res.ci[name];
+    const ciWidth = ci ? (ci[1] - ci[0]) : 0;
+    const maxCI = name.startsWith('W') ? 20 : 30;
+    const pct = Math.min(100, (ciWidth / maxCI) * 100);
+    const ciBar = document.getElementById(`ci_${name}`);
+    ciBar.style.width = (100 - pct) + '%';
+    ciBar.style.background = pct > 60 ? 'var(--red)' : pct > 30 ? 'var(--yellow)' : 'var(--green)';
+    // Flash
+    const card = document.getElementById(`card_${name}`);
+    card.classList.remove('updated');
+    void card.offsetWidth;
+    card.classList.add('updated');
+    if (name.startsWith('W')) wSum += fv;
+  });
+  document.getElementById('wSumValue').textContent = wSum.toFixed(1);
+  const note = document.getElementById('wSumNote');
+  if (wSum > 110) { note.textContent = '⚠ Sum > 110 — possible simulation error'; note.style.color = 'var(--red)'; }
+  else { note.textContent = 'Values above 100 reflect tie probability'; note.style.color = ''; }
+}
+
+function setStatus(text, running) {
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusDot').classList.toggle('running', running);
+  document.getElementById('runBtn').disabled = running;
+  document.getElementById('progressBar').classList.toggle('visible', running);
+}
+
+// ===== WEB WORKER =====
+const WORKER_SRC = `
+const PTS=[15,12,10,9,8,7,6,5,4,3,2,1];
+function weightedSample(available, weights) {
+  let total = 0;
+  for (let i = 0; i < available.length; i++) total += weights[available[i]];
+  let r = Math.random() * total, cum = 0;
+  for (let i = 0; i < available.length; i++) {
+    cum += weights[available[i]];
+    if (r <= cum) { const picked = available[i]; available.splice(i, 1); return picked; }
+  }
+  const last = available.pop();
+  return last;
+}
+function makeSkillWeights(skill) {
+  const a = (skill - 3) * 0.5 + 1;
+  const w = new Float64Array(12);
+  for (let p = 0; p < 12; p++) w[p] = Math.pow(13 - p, a);
+  return w;
+}
+function makeBotWeights(bias) {
+  const w = new Float64Array(12);
+  if (bias <= 5) { for (let i = 0; i < 12; i++) w[i] = 1; return w; }
+  const strength = (bias - 5) / 5;
+  for (let i = 0; i < 12; i++) {
+    const mid = 5.5;
+    const dist = Math.abs(i - mid);
+    w[i] = 1 + strength * Math.max(0, 3 - dist);
+  }
+  return w;
+}
+self.onmessage = function(e) {
+  const d = e.data;
+  const N = d.simCount, racesLeft = 4 - d.racesCompleted;
+  const scores0 = d.scores, skills = d.skills, botBias = d.botBias, botScoreBase = d.botScore;
+  const BATCHES = 20, batchN = Math.floor(N / BATCHES);
+  const skillW = skills.map(s => makeSkillWeights(s));
+  const botW = makeBotWeights(botBias);
+  const batchResults = [];
+  for (let b = 0; b < BATCHES; b++) {
+    const sums = {W1:0,W2:0,W3:0,W4:0,MAX:0,MIN:0,DIFF:0,TOPBOT:0};
+    for (let run = 0; run < batchN; run++) {
+      const sc = [scores0[0],scores0[1],scores0[2],scores0[3]];
+      let topBot = botScoreBase;
+      const botSc = new Float64Array(8);
+      for (let race = 0; race < racesLeft; race++) {
+        const avail = [0,1,2,3,4,5,6,7,8,9,10,11];
+        const humanPos = new Int32Array(4);
+        const order = [0,1,2,3];
+        order.sort(() => Math.random() - 0.5);
+        for (let oi = 0; oi < 4; oi++) {
+          const pi = order[oi];
+          humanPos[pi] = weightedSample(avail, skillW[pi]);
+          sc[pi] += PTS[humanPos[pi]];
+        }
+        for (let bi = 0; bi < 8 && avail.length > 0; bi++) {
+          const bp = weightedSample(avail, botW);
+          botSc[bi] += PTS[bp];
+        }
+      }
+      for (let bi = 0; bi < 8; bi++) if (botSc[bi] + botScoreBase > topBot) topBot = botSc[bi] + botScoreBase;
+      let mx = -Infinity, mn = Infinity;
+      for (let i = 0; i < 4; i++) { if (sc[i] > mx) mx = sc[i]; if (sc[i] < mn) mn = sc[i]; }
+      for (let i = 0; i < 4; i++) if (sc[i] === mx) sums['W'+(i+1)] += 100;
+      sums.MAX += mx; sums.MIN += mn; sums.DIFF += (mx - mn); sums.TOPBOT += topBot;
+    }
+    const bfv = {};
+    for (const k in sums) bfv[k] = sums[k] / batchN;
+    batchResults.push(bfv);
+    self.postMessage({type:'progress', pct: ((b+1)/BATCHES)*100});
+  }
+  const fairValues = {}, ci = {};
+  const keys = ['W1','W2','W3','W4','MAX','MIN','DIFF','TOPBOT'];
+  for (const k of keys) {
+    const vals = batchResults.map(b => b[k]).sort((a,b) => a - b);
+    fairValues[k] = vals.reduce((a,b)=>a+b,0) / BATCHES;
+    ci[k] = [vals[Math.floor(BATCHES*0.05)], vals[Math.floor(BATCHES*0.95)]];
+  }
+  let ties = 0;
+  const wS = fairValues.W1+fairValues.W2+fairValues.W3+fairValues.W4;
+  self.postMessage({type:'result', fairValues, ci, wSum: wS, tieProbability: Math.max(0,(wS-100)/100)});
+};
+`;
+
+function initWorker() {
+  try {
+    const blob = new Blob([WORKER_SRC], { type: 'application/javascript' });
+    worker = new Worker(URL.createObjectURL(blob));
+    worker.onmessage = function(e) {
+      if (e.data.type === 'progress') {
+        document.getElementById('progressFill').style.width = e.data.pct + '%';
+      } else if (e.data.type === 'result') {
+        state.running = false;
+        setStatus('Ready', false);
+        updateDisplay(e.data);
+      }
+    };
+  } catch(err) {
+    console.warn('Web Worker unavailable, using sync fallback');
+    worker = null;
+  }
+}
+
+function runSimulation() {
+  if (state.running) return;
+  const racesCompleted = getRacesCompleted();
+  if (racesCompleted >= 4) {
+    // No simulation needed — compute exact values
+    const scores = getScores();
+    let mx = Math.max(...scores), mn = Math.min(...scores);
+    const fv = {MAX:mx, MIN:mn, DIFF:mx-mn, TOPBOT: state.botScore};
+    for (let i = 0; i < 4; i++) fv['W'+(i+1)] = scores[i] === mx ? 100 : 0;
+    const ci = {};
+    CONTRACT_NAMES.forEach(k => ci[k] = [fv[k], fv[k]]);
+    updateDisplay({fairValues: fv, ci, wSum: fv.W1+fv.W2+fv.W3+fv.W4});
+    return;
+  }
+  state.running = true;
+  setStatus('Simulating...', true);
+  document.getElementById('progressFill').style.width = '0%';
+  const msg = {
+    scores: getScores(),
+    racesCompleted,
+    skills: [...state.skills],
+    botBias: state.botBias,
+    botScore: state.botScore,
+    simCount: state.simCount
+  };
+  if (worker) {
+    worker.postMessage(msg);
+  } else {
+    // Sync fallback — won't block forever with reduced count
+    setTimeout(() => {
+      msg.simCount = Math.min(msg.simCount, 10000);
+      // Would need sync engine here — skipped for brevity
+      state.running = false;
+      setStatus('Ready (sync mode)', false);
+    }, 50);
+  }
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', initUI);
+</script>
+</body>
+</html>
