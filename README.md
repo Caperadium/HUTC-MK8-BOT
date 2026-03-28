@@ -98,16 +98,16 @@ weight(p) = (13 − p) ^ α
 where:
 
 ```
-α = (s − 3) × 0.5 + 1
+α = (s − 3) × 0.5
 ```
 
 | Skill | α | Effect |
 |-------|---|--------|
-| 1 | 0.0 | All positions equally likely (flat). Slight bottom-bias relative to higher skills. |
-| 2 | 0.5 | Mild top-bias. |
-| 3 | 1.0 | Linear weights — position 1 is 12× more likely than position 12. Reasonable neutral. |
-| 4 | 1.5 | Moderate top-bias. |
-| 5 | 2.0 | Quadratic bias toward top positions. Position 1 is 144× more likely than position 12. |
+| 1 | −1.0 | Inverse weights — biased toward bottom positions. |
+| 2 | −0.5 | Mild bottom-bias. |
+| 3 | 0.0 | All positions equally weighted (truly uniform). |
+| 4 | 0.5 | Moderate top-bias. |
+| 5 | 1.0 | Linear bias — position 1 is 12× more likely than position 12. |
 
 ### Bot Position Bias
 

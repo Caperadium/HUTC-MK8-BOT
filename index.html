@@ -731,8 +731,15 @@ function weightedSample(available, weights) {
   const last = available.pop();
   return last;
 }
+function fisherYates(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
+}
 function makeSkillWeights(skill) {
-  const a = (skill - 3) * 0.5 + 1;
+  const a = (skill - 3) * 0.5;
   const w = new Float64Array(12);
   for (let p = 0; p < 12; p++) w[p] = Math.pow(13 - p, a);
   return w;
@@ -765,8 +772,7 @@ self.onmessage = function(e) {
       for (let race = 0; race < racesLeft; race++) {
         const avail = [0,1,2,3,4,5,6,7,8,9,10,11];
         const humanPos = new Int32Array(4);
-        const order = [0,1,2,3];
-        order.sort(() => Math.random() - 0.5);
+        const order = fisherYates([0,1,2,3]);
         for (let oi = 0; oi < 4; oi++) {
           const pi = order[oi];
           humanPos[pi] = weightedSample(avail, skillW[pi]);
